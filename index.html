@@ -105,11 +105,22 @@
   }
 
   function normalizeData(parsed) {
-    return parsed.data.map(row => {
+    const mapped = parsed.data.map(row => {
       const out = {};
       for (const k in row) out[k.trim()] = cleanString(row[k]);
       return out;
-    }).filter(r => Object.keys(r).length > 0);
+    });
+    return mapped.filter(r => {
+      const vals = Object.values(r);
+      if (vals.every(v => v === null)) return false;
+      const keys = Object.keys(r);
+      const isHeaderDuplicate = keys.every(k => {
+        const v = r[k];
+        return v !== null && String(v).trim() === String(k).trim();
+      });
+      if (isHeaderDuplicate) return false;
+      return true;
+    });
   }
 
   function fillValuesFor(colSelect, valSelect) {
@@ -170,7 +181,7 @@
 
       if (relation === "and") {
         result += `P(${c1} = ${v1} AND ${c2} = ${v2}) = ${fmt(joint, totalRows)}\n`;
-      } else if (relation === "given") {
+      } else {
         result += `P(${c1} = ${v1} AND ${c2} = ${v2}) = ${fmt(joint, totalRows)}\n`;
         if (count2 === 0) {
           result += `P(${c1} | ${c2}) cannot be computed (zero matching rows).\n`;
@@ -194,6 +205,7 @@
       val2row.style.display = 'flex';
     }
   }
+
   document.querySelectorAll('input[name="relation"]').forEach(r =>
     r.addEventListener('change', updateRelationVisibility)
   );
@@ -202,14 +214,11 @@
     try {
       status.textContent = "Loading...";
       const text = await fetch(csvPathInput.value).then(r => r.text());
-      const parsed = Papa.parse(text, { header: true });
-
+      const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
       rawData = normalizeData(parsed);
       populateColumns();
-
       ui.style.display = 'block';
       status.textContent = `Loaded ${rawData.length} rows`;
-
       updateRelationVisibility();
     } catch (e) {
       status.textContent = "Error loading CSV";
