@@ -51,7 +51,6 @@
         <label><input type="radio" name="relation" value="only"> OnlyCategory1</label>
       </div>
 
-      <!-- HIDDEN when OnlyCategory1 is selected -->
       <div class="row" id="cat2row">
         <label for="cat2">Category 2</label>
         <select id="cat2"></select>
@@ -195,8 +194,6 @@
       val2row.style.display = 'flex';
     }
   }
-
-  // Event listeners
   document.querySelectorAll('input[name="relation"]').forEach(r =>
     r.addEventListener('change', updateRelationVisibility)
   );
