@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>LeBron Survey - Probability Calculator</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; max-width:900px; margin:24px auto; padding:8px; color:#111; }
+    h1 { margin-top:0; }
+    .row { display:flex; gap:12px; align-items:center; margin:10px 0; flex-wrap:wrap; }
+    label { min-width:160px; font-weight:600; }
+    select, input[type=text] { padding:6px 8px; min-width:260px; }
+    button { padding:8px 12px; cursor:pointer; }
+    pre { background:#f6f8fa; border:1px solid #e1e4e8; padding:12px; white-space:pre-wrap; }
+    .small { font-size:0.9em; color:#444; }
+    .muted { color:#666; font-size:0.9em; }
+    .section { border-radius:8px; padding:12px; margin:12px 0; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+<body>
+  <h1>LeBron Survey — Probability Calculator</h1>
+  <p class="muted">
+    Place this file and the CSV in the same folder. The CSV filename must be:<br>
+    <code>Tompkins Students - LeBron James Knowledge Survey (Responses) - Sheet1.csv</code>
+  </p>
+
+  <div class="section">
+    <div class="row">
+      <label for="csvPath">CSV filename</label>
+      <input id="csvPath" type="text" value="Tompkins Students - LeBron James Knowledge Survey (Responses) - Sheet1.csv" />
+      <button id="loadBtn">Load CSV</button>
+      <span id="status" class="small muted">Not loaded</span>
+    </div>
+
+    <div id="ui" style="display:none;">
+      <div class="row">
+        <label for="cat1">Category 1</label>
+        <select id="cat1"></select>
+      </div>
+
+      <div class="row">
+        <label for="val1">Response (Category 1)</label>
+        <select id="val1"></select>
+      </div>
+
+      <div class="row">
+        <label>Relation</label>
+        <label><input type="radio" name="relation" value="and" checked> And</label>
+        <label><input type="radio" name="relation" value="given"> Given</label>
+        <label><input type="radio" name="relation" value="only"> OnlyCategory1</label>
+      </div>
+
+      <!-- HIDDEN when OnlyCategory1 is selected -->
+      <div class="row" id="cat2row">
+        <label for="cat2">Category 2</label>
+        <select id="cat2"></select>
+      </div>
+
+      <div class="row" id="val2row">
+        <label for="val2">Response (Category 2)</label>
+        <select id="val2"></select>
+      </div>
+
+      <div class="row">
+        <button id="computeBtn">Compute</button>
+        <button id="resetBtn">Reset</button>
+      </div>
+
+      <div id="output" class="section" style="display:none;">
+        <h3>Results</h3>
+        <pre id="resultsPre">—</pre>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+
+  const status = $('status');
+  const loadBtn = $('loadBtn');
+  const csvPathInput = $('csvPath');
+  const ui = $('ui');
+
+  const cat1 = $('cat1'), val1 = $('val1');
+  const cat2 = $('cat2'), val2 = $('val2');
+
+  const computeBtn = $('computeBtn');
+  const resetBtn = $('resetBtn');
+
+  const output = $('output');
+  const resultsPre = $('resultsPre');
+
+  const cat2row = $('cat2row');
+  const val2row = $('val2row');
+
+  let rawData = null;
+  let totalRows = 0;
+
+  function cleanString(s) {
+    if (s == null) return null;
+    let t = String(s).trim();
+    if (t === '' || t.toLowerCase() === 'nan' || t.toLowerCase() === 'none') return null;
+    return t;
+  }
+
+  function normalizeData(parsed) {
+    return parsed.data.map(row => {
+      const out = {};
+      for (const k in row) out[k.trim()] = cleanString(row[k]);
+      return out;
+    }).filter(r => Object.keys(r).length > 0);
+  }
+
+  function fillValuesFor(colSelect, valSelect) {
+    valSelect.innerHTML = '';
+    const col = colSelect.value;
+    const values = [...new Set(rawData.map(r => r[col]).filter(v => v !== null))];
+    values.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v;
+      valSelect.appendChild(opt);
+    });
+  }
+
+  function populateColumns() {
+    const columns = Object.keys(rawData[0]);
+    totalRows = rawData.length;
+
+    cat1.innerHTML = '';
+    cat2.innerHTML = '';
+
+    columns.forEach(c => {
+      const o1 = document.createElement('option');
+      o1.value = c; o1.textContent = c;
+      cat1.appendChild(o1);
+
+      const o2 = document.createElement('option');
+      o2.value = c; o2.textContent = c;
+      cat2.appendChild(o2);
+    });
+
+    fillValuesFor(cat1, val1);
+    fillValuesFor(cat2, val2);
+  }
+
+  function fmt(count, denom) {
+    const pct = denom > 0 ? (count / denom * 100) : 0;
+    return `${pct.toFixed(2)}% (${count}/${denom})`;
+  }
+
+  function compute() {
+    const c1 = cat1.value, v1 = val1.value;
+    const relation = document.querySelector('input[name="relation"]:checked').value;
+
+    const cond1 = rawData.map(r => r[c1] === v1);
+    const count1 = cond1.filter(Boolean).length;
+
+    let result = "";
+
+    if (relation === "only") {
+      result += `P(${c1} = ${v1}) = ${fmt(count1, totalRows)}\n`;
+      result += `P(${c1} != ${v1}) = ${fmt(totalRows - count1, totalRows)}\n`;
+    } else {
+      const c2 = cat2.value, v2 = val2.value;
+      const cond2 = rawData.map(r => r[c2] === v2);
+      const count2 = cond2.filter(Boolean).length;
+      const joint = cond1.filter((x, i) => x && cond2[i]).length;
+
+      if (relation === "and") {
+        result += `P(${c1} = ${v1} AND ${c2} = ${v2}) = ${fmt(joint, totalRows)}\n`;
+      } else if (relation === "given") {
+        result += `P(${c1} = ${v1} AND ${c2} = ${v2}) = ${fmt(joint, totalRows)}\n`;
+        if (count2 === 0) {
+          result += `P(${c1} | ${c2}) cannot be computed (zero matching rows).\n`;
+        } else {
+          result += `P(${c1} = ${v1} | ${c2} = ${v2}) = ${fmt(joint, count2)}\n`;
+        }
+      }
+    }
+
+    resultsPre.textContent = result;
+    output.style.display = 'block';
+  }
+
+  function updateRelationVisibility() {
+    const relation = document.querySelector('input[name="relation"]:checked').value;
+    if (relation === "only") {
+      cat2row.style.display = 'none';
+      val2row.style.display = 'none';
+    } else {
+      cat2row.style.display = 'flex';
+      val2row.style.display = 'flex';
+    }
+  }
+
+  // Event listeners
+  document.querySelectorAll('input[name="relation"]').forEach(r =>
+    r.addEventListener('change', updateRelationVisibility)
+  );
+
+  loadBtn.addEventListener('click', async () => {
+    try {
+      status.textContent = "Loading...";
+      const text = await fetch(csvPathInput.value).then(r => r.text());
+      const parsed = Papa.parse(text, { header: true });
+
+      rawData = normalizeData(parsed);
+      populateColumns();
+
+      ui.style.display = 'block';
+      status.textContent = `Loaded ${rawData.length} rows`;
+
+      updateRelationVisibility();
+    } catch (e) {
+      status.textContent = "Error loading CSV";
+      console.error(e);
+    }
+  });
+
+  cat1.addEventListener('change', () => fillValuesFor(cat1, val1));
+  cat2.addEventListener('change', () => fillValuesFor(cat2, val2));
+
+  computeBtn.addEventListener('click', compute);
+
+  resetBtn.addEventListener('click', () => {
+    output.style.display = 'none';
+    resultsPre.textContent = "";
+  });
+
+})();
+</script>
+</body>
+</html>
