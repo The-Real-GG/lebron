@@ -124,21 +124,16 @@
   }
 
   function fillValuesFor(colSelect, valSelect) {
-  valSelect.innerHTML = '';
-  const col = colSelect.value;
-
-  let values = [...new Set(rawData.map(r => r[col]).filter(v => v !== null))];
-  
-  values = values.filter(v => v.toLowerCase() !== "heat");
-
-  values.forEach(v => {
-    const opt = document.createElement('option');
-    opt.value = v;
-    opt.textContent = v;
-    valSelect.appendChild(opt);
-  });
-}
-
+    valSelect.innerHTML = '';
+    const col = colSelect.value;
+    const values = [...new Set(rawData.map(r => r[col]).filter(v => v !== null))];
+    values.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v;
+      valSelect.appendChild(opt);
+    });
+  }
 
   function populateColumns() {
     const columns = Object.keys(rawData[0]);
